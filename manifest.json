@@ -1,17 +1,22 @@
 {
   "manifest_version": 3,
-  "name": "Go to Clipboard",
+  "name": "Element Selector",
   "version": "1.0",
-  "description": "Extract texts from the page and copy them to the clipboard.",
-  "permissions": ["scripting", "clipboardWrite"],
-  "host_permissions": ["<all_urls>"],
-  "background": {
-    "service_worker": "background.js"
-  },
+  "description": "웹 페이지에서 요소를 선택하고 텍스트를 복사하는 도구",
+  "permissions": ["activeTab", "scripting", "clipboardWrite"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
-      "16": "icon.png"
+      "16": "icon.png",
+      "32": "icon.png",
+      "48": "icon.png",
+      "128": "icon.png"
     }
+  },
+  "icons": {
+    "16": "icon.png",
+    "32": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
   }
 }

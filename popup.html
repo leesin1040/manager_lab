@@ -1,66 +1,33 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <title>Copy Names</title>
+    <title>이름 복사하기</title>
     <style>
       body {
-        width: 300px;
+        width: 200px;
         padding: 20px;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        background-color: #f5f5f5;
+        text-align: center;
+        font-family: 'Noto Sans KR', sans-serif;
       }
-
-      .container {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
-
       button {
-        padding: 10px 15px;
-        border: none;
-        border-radius: 5px;
+        width: 100%;
+        padding: 10px;
         background-color: #4caf50;
         color: white;
-        font-size: 14px;
+        border: none;
+        border-radius: 5px;
         cursor: pointer;
-        transition: all 0.3s ease;
+        font-size: 14px;
+        transition: background-color 0.3s;
       }
-
       button:hover {
         background-color: #45a049;
-        transform: translateY(-2px);
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-      }
-
-      button:active {
-        transform: translateY(0);
-      }
-
-      .secondary {
-        background-color: #2196f3;
-      }
-
-      .secondary:hover {
-        background-color: #1976d2;
-      }
-
-      .tertiary {
-        background-color: #9c27b0;
-      }
-
-      .tertiary:hover {
-        background-color: #7b1fa2;
       }
     </style>
   </head>
   <body>
-    <div class="container">
-      <button id="copyAll">모든 이름 복사</button>
-      <button id="copySelected" class="secondary">선택된 이름 복사</button>
-      <button id="copyCustom" class="tertiary">사용자 지정 복사</button>
-    </div>
+    <button id="runScript">모든 이름 복사하기</button>
     <script src="popup.js"></script>
   </body>
 </html>
