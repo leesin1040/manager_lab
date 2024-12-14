@@ -2,7 +2,7 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <title>이름 복사하기</title>
+    <title>데이터 복사하기</title>
     <style>
       body {
         width: 200px;
@@ -20,14 +20,24 @@
         cursor: pointer;
         font-size: 14px;
         transition: background-color 0.3s;
+        margin-bottom: 10px;
       }
       button:hover {
         background-color: #45a049;
       }
+      #copyPlayerNames {
+        background-color: #9c27b0; /* 보라색 */
+      }
+      #copyPlayerNames:hover {
+        background-color: #7b1fa2; /* 좀 더 어두운 보라색 */
+      }
     </style>
   </head>
   <body>
-    <button id="runScript">모든 이름 복사하기</button>
+    <button id="copyNames">[백]수강생 복사하기</button>
+    <button id="copyHRDStatus">[백]HRD 상태 복사하기</button>
+    <button id="copyTodayStatus">[백]접속 상태 복사하기</button>
+    <button id="copyPlayerNames">잽 접속자 복사하기</button>
     <script src="popup.js"></script>
   </body>
 </html>
