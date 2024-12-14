@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Go to Clipboard",
+  "version": "1.0",
+  "description": "Extract texts from the page and copy them to the clipboard.",
+  "permissions": ["scripting", "clipboardWrite"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon.png"
+    }
+  }
+}
