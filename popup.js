@@ -93,24 +93,45 @@ document.getElementById('copyAllData').addEventListener('click', () => {
   });
 });
 
-// 모든 데이터 추출 함수
-function extractAllData() {
-  const containers = document.querySelectorAll('.css-856oyk');
-  let data = [];
+function extractTableData() {
+  const nameSelector =
+    '#__next > section > section > main > div > div > div > div.ant-table-wrapper.css-8n0ts4.css-1eetj9p > div > div > div > div > div > table > tbody > tr > td:nth-child(2)';
+  const statusSelector =
+    '#__next > section > section > main > div > div > div > div.ant-table-wrapper.css-8n0ts4.css-1eetj9p > div > div > div > div > div > table > tbody > tr > td:nth-child(8)';
 
-  containers.forEach((container) => {
-    const nameElement = container.querySelector('.css-t5162q');
-    const hrdElement = container.querySelector('.css-1bu79bc');
-    const todayElement = container.querySelector('.css-1r3nu2g');
+  // 이름과 상태 데이터 추출
+  const names = Array.from(document.querySelectorAll(nameSelector)).map((el) =>
+    el.textContent.trim()
+  );
+  const statuses = Array.from(document.querySelectorAll(statusSelector)).map(
+    (el) => el.textContent.trim()
+  );
 
-    const name = nameElement ? nameElement.textContent.trim() : '';
-    const hrd = hrdElement ? hrdElement.textContent.trim() : '';
-    const today = todayElement ? todayElement.textContent.trim() : '';
+  // 데이터 포맷팅
+  const rows = names.map((name, index) => `${name}\t${statuses[index] || ''}`);
 
-    if (name) {
-      data.push(`${name}\t${hrd}\t${today}`);
-    }
-  });
-
-  return data.join('\n');
+  return rows.join('\n');
 }
+
+// 테이블 데이터 복사 버튼 이벤트 리스너
+document.getElementById('copyTableData').addEventListener('click', () => {
+  const button = document.getElementById('copyTableData');
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    chrome.scripting.executeScript(
+      {
+        target: { tabId: tabs[0].id },
+        function: extractTableData,
+      },
+      (results) => {
+        if (results && results[0] && results[0].result) {
+          navigator.clipboard
+            .writeText(results[0].result)
+            .then(() => updateButtonStatus(button))
+            .catch(() => updateButtonStatus(button, false));
+        } else {
+          updateButtonStatus(button, false);
+        }
+      }
+    );
+  });
+});
