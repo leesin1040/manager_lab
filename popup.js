@@ -72,27 +72,6 @@ function extractPlayerNames() {
   return [];
 }
 
-// 전체 데이터 복사 기능
-document.getElementById('copyAllData').addEventListener('click', () => {
-  const button = document.getElementById('copyAllData');
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    chrome.scripting.executeScript(
-      {
-        target: { tabId: tabs[0].id },
-        function: extractAllData,
-      },
-      (results) => {
-        if (results && results[0] && results[0].result) {
-          navigator.clipboard
-            .writeText(results[0].result)
-            .then(() => updateButtonStatus(button))
-            .catch(() => updateButtonStatus(button, false));
-        }
-      }
-    );
-  });
-});
-
 function extractTableData() {
   const nameSelector =
     '#__next > section > section > main > div > div > div > div.ant-table-wrapper.css-8n0ts4.css-1eetj9p > div > div > div > div > div > table > tbody > tr > td:nth-child(2)';
