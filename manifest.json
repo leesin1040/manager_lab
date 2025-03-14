@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Element Selector",
+  "name": "매니저랩",
   "version": "1.0",
-  "description": "웹 페이지에서 요소를 선택하고 텍스트를 복사하는 도구",
+  "description": "ZEP 사용자 목록을 텍스트로 복사하는 도구",
   "permissions": ["activeTab", "scripting", "clipboardWrite"],
   "action": {
     "default_popup": "popup.html",
