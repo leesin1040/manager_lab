@@ -33,6 +33,42 @@ document.getElementById('copyPlayerNames').addEventListener('click', () => {
   });
 });
 
+// 줌 참가자 명단 복사 기능
+document.getElementById('copyZoomParticipants').addEventListener('click', () => {
+  const button = document.getElementById('copyZoomParticipants');
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const tabId = tabs[0] && tabs[0].id;
+    if (!tabId) {
+      updateButtonStatus(button, false);
+      return;
+    }
+
+    chrome.webNavigation.getAllFrames({ tabId }, (frames) => {
+      const frameIds = (frames || [])
+        .map((frame) => frame.frameId)
+        .filter((id) => Number.isInteger(id));
+
+      chrome.scripting.executeScript(
+        {
+          target: { tabId, frameIds },
+          function: extractZoomParticipants,
+        },
+        async (results) => {
+          const names = (results || [])
+            .flatMap((item) => (Array.isArray(item.result) ? item.result : []))
+            .filter((name) => typeof name === 'string' && name.length > 0)
+            .filter((name, index, arr) => arr.indexOf(name) === index);
+
+          navigator.clipboard
+            .writeText(names.join('\n'))
+            .then(() => updateButtonStatus(button, names.length > 0))
+            .catch(() => updateButtonStatus(button, false));
+        }
+      );
+    });
+  });
+});
+
 // 잽 접속자 이름 추출 함수
 function extractPlayerNames() {
   const playerListButton = document.querySelector(
@@ -116,6 +152,30 @@ function extractPlayerNames() {
     });
   }
   return [];
+}
+
+// 줌 참가자 이름 추출 함수 (웹 버전 줌 기준)
+function extractZoomParticipants() {
+  try {
+    const participants = [];
+    const participantElements = document.querySelectorAll(
+      '[class*="participants-item"]'
+    );
+
+    participantElements.forEach((el) => {
+      const nameEl = el.querySelector('[class*="display-name"]');
+      if (nameEl) {
+        const name = nameEl.textContent.trim();
+        if (name && !participants.includes(name)) {
+          participants.push(name);
+        }
+      }
+    });
+
+    return participants;
+  } catch (e) {
+    return [];
+  }
 }
 
 // 완료자 이름 복사 버튼: 특정 페이지에서 상태 텍스트 기준으로 이름 수집
