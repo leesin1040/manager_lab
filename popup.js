@@ -1,21 +1,15 @@
-function setStatusMessage(message = '') {
-  const statusEl = document.getElementById('statusMessage');
-  if (statusEl) statusEl.textContent = message;
-}
-
 function updateButtonStatus(button, success = true, message = '') {
-  const originalText = button.textContent;
+  const defaultText = button.dataset.defaultText || button.textContent;
   const originalColor = button.style.backgroundColor;
   const statusText = message || (success ? '복사 완료!' : '복사 실패');
 
   button.textContent = statusText;
   button.style.backgroundColor = success ? '#2196F3' : '#f44336';
-  setStatusMessage(statusText);
 
   setTimeout(() => {
-    button.textContent = originalText;
+    button.textContent = defaultText;
     button.style.backgroundColor = originalColor;
-    setStatusMessage('');
+    button.dataset.defaultText = '';
   }, 3000);
 }
 
@@ -46,8 +40,9 @@ document
   .getElementById('copyZoomParticipants')
   .addEventListener('click', () => {
     const button = document.getElementById('copyZoomParticipants');
+    const defaultText = button.textContent;
     button.textContent = '작업 중...';
-    setStatusMessage('작업 중...');
+    button.dataset.defaultText = defaultText;
 
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tabId = tabs[0] && tabs[0].id;
@@ -56,52 +51,59 @@ document
         return;
       }
 
+      let finished = false;
+      const timeoutId = setTimeout(() => {
+        if (!finished) {
+          finished = true;
+          updateButtonStatus(button, false, '시간 초과');
+        }
+      }, 30000);
+
+      const handleResults = (results) => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timeoutId);
+
+        if (chrome.runtime.lastError) {
+          updateButtonStatus(
+            button,
+            false,
+            '스크립트 실패: ' + chrome.runtime.lastError.message
+          );
+          return;
+        }
+
+        // 모든 프레임 결과를 합침
+        var allNames = [];
+        (results || []).forEach(function (item) {
+          var r = item.result || {};
+          var names = Array.isArray(r.names) ? r.names : [];
+          names.forEach(function (name) {
+            if (name && allNames.indexOf(name) === -1) {
+              allNames.push(name);
+            }
+          });
+        });
+
+        if (allNames.length > 0) {
+          navigator.clipboard
+            .writeText(allNames.join('\n'))
+            .then(() =>
+              updateButtonStatus(button, true, `${allNames.length}명 복사!`)
+            )
+            .catch(() => updateButtonStatus(button, false, '클립보드 실패'));
+        } else {
+          updateButtonStatus(button, false, '참가자 없음');
+        }
+      };
+
       chrome.scripting.executeScript(
         {
           target: { tabId, allFrames: true },
           world: 'MAIN',
           function: extractZoomParticipants,
         },
-        (results) => {
-          if (chrome.runtime.lastError) {
-            updateButtonStatus(
-              button,
-              false,
-              '스크립트 실패: ' + chrome.runtime.lastError.message
-            );
-            return;
-          }
-
-          // 모든 프레임 결과를 합침
-          var allNames = [];
-          (results || []).forEach(function (item) {
-            var r = item.result || {};
-            var names = Array.isArray(r.names) ? r.names : [];
-            names.forEach(function (name) {
-              if (name && allNames.indexOf(name) === -1) {
-                allNames.push(name);
-              }
-            });
-          });
-
-          if (allNames.length > 0) {
-            navigator.clipboard
-              .writeText(allNames.join('\n'))
-              .then(() =>
-                updateButtonStatus(button, true, `${allNames.length}명 복사!`)
-              )
-              .catch(() => updateButtonStatus(button, false, '클립보드 실패'));
-          } else {
-            // 디버그: 각 프레임 정보 표시
-            var info = (results || [])
-              .map(function (item) {
-                var r = item.result || {};
-                return (r.elCount || 0) + '@' + (r.url || '').substring(0, 30);
-              })
-              .join(' | ');
-            updateButtonStatus(button, false, info || '참가자 없음');
-          }
-        }
+        handleResults
       );
     });
   });
@@ -194,14 +196,18 @@ function extractPlayerNames() {
 // 줌 참가자 이름 추출 함수 (웹 버전 줌 - MAIN world에서 실행)
 async function extractZoomParticipants() {
   var participants = [];
+  var seenPositions = {};
 
   function collectVisible() {
-    var items = document.querySelectorAll('[class*="participants-item"]');
-    items.forEach(function (el) {
-      var nameEl = el.querySelector('[class*="display-name"]');
+    var positionEls = document.querySelectorAll('.participants-item-position');
+    positionEls.forEach(function (posEl) {
+      var top = posEl.style.top;
+      if (!top || seenPositions[top]) return;
+      var nameEl = posEl.querySelector('[class*="display-name"]');
       if (nameEl) {
         var name = nameEl.textContent.trim();
-        if (name && participants.indexOf(name) === -1) {
+        if (name) {
+          seenPositions[top] = true;
           participants.push(name);
         }
       }
@@ -233,29 +239,39 @@ async function extractZoomParticipants() {
   }
 
   // 스크롤하면서 전체 수집
-  var originalScrollTop = scrollContainer.scrollTop;
-  var lastScrollTop = -1;
-  var safety = 0;
+  var itemHeight = 42;
+  var totalHeight = scrollContainer.scrollHeight;
+  var viewHeight = scrollContainer.clientHeight;
+  // 렌더되는 아이템 수보다 적게 이동해서 누락 방지
+  var visibleItems = Math.floor(viewHeight / itemHeight);
+  var step = Math.max((visibleItems - 3) * itemHeight, itemHeight * 2);
+  var maxScrollTop = Math.max(0, totalHeight - viewHeight);
 
   scrollContainer.scrollTop = 0;
   scrollContainer.dispatchEvent(new Event('scroll', { bubbles: true }));
-  await delay(200);
+  await delay(300);
+  collectVisible();
 
-  while (scrollContainer.scrollTop !== lastScrollTop && safety < 100) {
-    lastScrollTop = scrollContainer.scrollTop;
-    collectVisible();
-
-    scrollContainer.scrollTop = Math.min(
-      scrollContainer.scrollTop + scrollContainer.clientHeight,
-      scrollContainer.scrollHeight
-    );
+  for (var pos = step; pos <= maxScrollTop; pos += step) {
+    scrollContainer.scrollTop = pos;
     scrollContainer.dispatchEvent(new Event('scroll', { bubbles: true }));
-    await delay(200);
-    safety++;
+    await delay(250);
+    collectVisible();
   }
 
-  // 마지막 위치에서도 수집
+  // 반드시 맨 끝으로 이동해서 마지막 참가자 수집
+  scrollContainer.scrollTop = maxScrollTop;
+  scrollContainer.dispatchEvent(new Event('scroll', { bubbles: true }));
+  await delay(300);
   collectVisible();
+
+  // 혹시 누락된 구간을 위해 한번 더 역방향 스크롤
+  for (var pos2 = maxScrollTop - step; pos2 >= 0; pos2 -= step * 2) {
+    scrollContainer.scrollTop = Math.max(pos2, 0);
+    scrollContainer.dispatchEvent(new Event('scroll', { bubbles: true }));
+    await delay(150);
+    collectVisible();
+  }
 
   // 스크롤 원래 위치로 복귀
   scrollContainer.scrollTop = 0;
