@@ -1,15 +1,27 @@
-function updateButtonStatus(button, success = true) {
+function setStatusMessage(message = '') {
+  const statusEl = document.getElementById('statusMessage');
+  if (statusEl) statusEl.textContent = message;
+}
+
+function updateButtonStatus(button, success = true, message = '') {
   const originalText = button.textContent;
   const originalColor = button.style.backgroundColor;
+  const statusText = message || (success ? '복사 완료!' : '복사 실패');
 
-  button.textContent = success ? '복사 완료!' : '복사 실패';
+  button.textContent = statusText;
   button.style.backgroundColor = success ? '#2196F3' : '#f44336';
+  setStatusMessage(statusText);
 
   setTimeout(() => {
     button.textContent = originalText;
     button.style.backgroundColor = originalColor;
+    setStatusMessage('');
   }, 3000);
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  setStatusMessage('준비됨');
+});
 
 // 잽 접속자 명단 복사 기능
 document.getElementById('copyPlayerNames').addEventListener('click', () => {
@@ -33,41 +45,70 @@ document.getElementById('copyPlayerNames').addEventListener('click', () => {
   });
 });
 
-// 줌 참가자 명단 복사 기능
-document.getElementById('copyZoomParticipants').addEventListener('click', () => {
-  const button = document.getElementById('copyZoomParticipants');
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    const tabId = tabs[0] && tabs[0].id;
-    if (!tabId) {
-      updateButtonStatus(button, false);
-      return;
-    }
+// 줌 참가자 명단 복사 기능 (world: MAIN으로 콘솔과 동일 환경)
+document
+  .getElementById('copyZoomParticipants')
+  .addEventListener('click', () => {
+    const button = document.getElementById('copyZoomParticipants');
+    button.textContent = '작업 중...';
+    setStatusMessage('작업 중...');
 
-    chrome.webNavigation.getAllFrames({ tabId }, (frames) => {
-      const frameIds = (frames || [])
-        .map((frame) => frame.frameId)
-        .filter((id) => Number.isInteger(id));
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tabId = tabs[0] && tabs[0].id;
+      if (!tabId) {
+        updateButtonStatus(button, false, '탭 없음');
+        return;
+      }
 
       chrome.scripting.executeScript(
         {
-          target: { tabId, frameIds },
+          target: { tabId, allFrames: true },
+          world: 'MAIN',
           function: extractZoomParticipants,
         },
-        async (results) => {
-          const names = (results || [])
-            .flatMap((item) => (Array.isArray(item.result) ? item.result : []))
-            .filter((name) => typeof name === 'string' && name.length > 0)
-            .filter((name, index, arr) => arr.indexOf(name) === index);
+        (results) => {
+          if (chrome.runtime.lastError) {
+            updateButtonStatus(
+              button,
+              false,
+              '스크립트 실패: ' + chrome.runtime.lastError.message
+            );
+            return;
+          }
 
-          navigator.clipboard
-            .writeText(names.join('\n'))
-            .then(() => updateButtonStatus(button, names.length > 0))
-            .catch(() => updateButtonStatus(button, false));
+          // 모든 프레임 결과를 합침
+          var allNames = [];
+          (results || []).forEach(function (item) {
+            var r = item.result || {};
+            var names = Array.isArray(r.names) ? r.names : [];
+            names.forEach(function (name) {
+              if (name && allNames.indexOf(name) === -1) {
+                allNames.push(name);
+              }
+            });
+          });
+
+          if (allNames.length > 0) {
+            navigator.clipboard
+              .writeText(allNames.join('\n'))
+              .then(() =>
+                updateButtonStatus(button, true, `${allNames.length}명 복사!`)
+              )
+              .catch(() => updateButtonStatus(button, false, '클립보드 실패'));
+          } else {
+            // 디버그: 각 프레임 정보 표시
+            var info = (results || [])
+              .map(function (item) {
+                var r = item.result || {};
+                return (r.elCount || 0) + '@' + (r.url || '').substring(0, 30);
+              })
+              .join(' | ');
+            updateButtonStatus(button, false, info || '참가자 없음');
+          }
         }
       );
     });
   });
-});
 
 // 잽 접속자 이름 추출 함수
 function extractPlayerNames() {
@@ -154,28 +195,78 @@ function extractPlayerNames() {
   return [];
 }
 
-// 줌 참가자 이름 추출 함수 (웹 버전 줌 기준)
-function extractZoomParticipants() {
-  try {
-    const participants = [];
-    const participantElements = document.querySelectorAll(
-      '[class*="participants-item"]'
-    );
+// 줌 참가자 이름 추출 함수 (웹 버전 줌 - MAIN world에서 실행)
+async function extractZoomParticipants() {
+  var participants = [];
 
-    participantElements.forEach((el) => {
-      const nameEl = el.querySelector('[class*="display-name"]');
+  function collectVisible() {
+    var items = document.querySelectorAll('[class*="participants-item"]');
+    items.forEach(function (el) {
+      var nameEl = el.querySelector('[class*="display-name"]');
       if (nameEl) {
-        const name = nameEl.textContent.trim();
-        if (name && !participants.includes(name)) {
+        var name = nameEl.textContent.trim();
+        if (name && participants.indexOf(name) === -1) {
           participants.push(name);
         }
       }
     });
-
-    return participants;
-  } catch (e) {
-    return [];
   }
+
+  function delay(ms) {
+    return new Promise(function (r) {
+      setTimeout(r, ms);
+    });
+  }
+
+  // 현재 보이는 것 먼저 수집
+  collectVisible();
+
+  // 스크롤 컨테이너 찾기
+  var scrollContainer =
+    document.querySelector('#participants-ul') ||
+    document.querySelector('[aria-label="Participants list"]');
+  if (!scrollContainer || scrollContainer.scrollHeight <= scrollContainer.clientHeight) {
+    return {
+      names: participants,
+      url: document.location.href,
+      elCount: participants.length,
+    };
+  }
+
+  // 스크롤하면서 전체 수집
+  var originalScrollTop = scrollContainer.scrollTop;
+  var lastScrollTop = -1;
+  var safety = 0;
+
+  scrollContainer.scrollTop = 0;
+  scrollContainer.dispatchEvent(new Event('scroll', { bubbles: true }));
+  await delay(200);
+
+  while (scrollContainer.scrollTop !== lastScrollTop && safety < 100) {
+    lastScrollTop = scrollContainer.scrollTop;
+    collectVisible();
+
+    scrollContainer.scrollTop = Math.min(
+      scrollContainer.scrollTop + scrollContainer.clientHeight,
+      scrollContainer.scrollHeight
+    );
+    scrollContainer.dispatchEvent(new Event('scroll', { bubbles: true }));
+    await delay(200);
+    safety++;
+  }
+
+  // 마지막 위치에서도 수집
+  collectVisible();
+
+  // 스크롤 원래 위치로 복귀
+  scrollContainer.scrollTop = 0;
+  scrollContainer.dispatchEvent(new Event('scroll', { bubbles: true }));
+
+  return {
+    names: participants,
+    url: document.location.href,
+    elCount: participants.length,
+  };
 }
 
 // 완료자 이름 복사 버튼: 특정 페이지에서 상태 텍스트 기준으로 이름 수집

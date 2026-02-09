@@ -3,7 +3,8 @@
   "name": "매니저랩",
   "version": "1.0",
   "description": "ZEP 사용자 목록을 텍스트로 복사하는 도구",
-  "permissions": ["activeTab", "scripting", "clipboardWrite", "webNavigation"],
+  "permissions": ["activeTab", "scripting", "clipboardWrite"],
+  "host_permissions": ["*://*.zoom.us/*"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
