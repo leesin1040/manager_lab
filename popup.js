@@ -19,10 +19,6 @@ function updateButtonStatus(button, success = true, message = '') {
   }, 3000);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  setStatusMessage('준비됨');
-});
-
 // 잽 접속자 명단 복사 기능
 document.getElementById('copyPlayerNames').addEventListener('click', () => {
   const button = document.getElementById('copyPlayerNames');
@@ -225,7 +221,10 @@ async function extractZoomParticipants() {
   var scrollContainer =
     document.querySelector('#participants-ul') ||
     document.querySelector('[aria-label="Participants list"]');
-  if (!scrollContainer || scrollContainer.scrollHeight <= scrollContainer.clientHeight) {
+  if (
+    !scrollContainer ||
+    scrollContainer.scrollHeight <= scrollContainer.clientHeight
+  ) {
     return {
       names: participants,
       url: document.location.href,
@@ -300,7 +299,11 @@ function extractCompletedNames() {
       .map((el) => (el.textContent || '').trim())
       .filter((text) => text.length > 0);
     const names = arr.reduce((list, text, idx) => {
-      if (text === '입실 완료' || text === '입실(지각)완료') {
+      if (
+        text === '입실 완료' ||
+        text === '입실(지각)완료' ||
+        text === '입실(정상)'
+      ) {
         const name = arr[idx - 5];
         if (name) list.push(name);
       }
